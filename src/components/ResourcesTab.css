@@ -1,0 +1,22 @@
+.resources-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.resources-title {
+  font-size: 26px;
+  color: #e0001b;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.resource-card {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  background-color: #fff;
+}
