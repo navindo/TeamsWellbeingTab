@@ -18,7 +18,9 @@ export default function SettingsTab() {
         setObjectId(id);
 
         if (id) {
-          fetch(`https://<your-backend-url>/api/user/settings?objectId=${id}`)
+          fetch(
+            `https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`
+          )
             .then((res) => res.json())
             .then((data) => {
               setNotificationsEnabled(data.notificationsEnabled);
