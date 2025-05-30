@@ -43,11 +43,14 @@ export default function SettingsTab() {
         snoozedUntilUtc: snoozeTime,
       };
 
-      fetch("https://<your-backend-url>/api/user/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).then(() => {
+      fetch(
+        "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      ).then(() => {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       });
