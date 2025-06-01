@@ -10,34 +10,45 @@ export default function SettingsTab() {
   const [snoozedUntil, setSnoozedUntil] = useState(null);
   const [showToast, setShowToast] = useState(false);
 
-  // Initialize Teams SDK and get objectId
   useEffect(() => {
-    microsoftTeams.app.initialize().then(() => {
-      microsoftTeams.app.getContext().then((context) => {
+    console.log("[INIT] Initializing Teams SDK...");
+    microsoftTeams.app
+      .initialize()
+      .then(() => {
+        console.log("[INIT] Teams SDK initialized.");
+        return microsoftTeams.app.getContext();
+      })
+      .then((context) => {
         const id = context.user?.aadObjectId;
+        console.log("[TeamsContext] Retrieved AAD objectId:", id);
         setObjectId(id);
 
         if (id) {
-          fetch(
-            `https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`
-          )
-            .then((res) => res.json())
+          const url = `https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`;
+          console.log("[API][GET] Fetching user settings from:", url);
+          fetch(url)
+            .then((res) => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+            })
             .then((data) => {
+              console.log("[API][GET] Settings received:", data);
               setNotificationsEnabled(data.notificationsEnabled);
               setSnoozedUntil(data.snoozedUntilUtc);
-            });
+            })
+            .catch((err) =>
+              console.error("[API][GET] Failed to fetch settings:", err)
+            );
         }
-      });
-    });
+      })
+      .catch((err) => console.error("[INIT] Teams SDK error:", err));
   }, []);
 
   const handleSnooze = (hours) => {
-    const snoozeTime = new Date(
-      Date.now() + hours * 60 * 60 * 1000
-    ).toISOString();
+    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    console.log(`[SNOOZE] Setting snooze for ${hours} hours → ${snoozeTime}`);
     setSnoozedUntil(snoozeTime);
 
-    // Auto-save snooze setting
     if (objectId) {
       const payload = {
         objectId,
@@ -45,6 +56,7 @@ export default function SettingsTab() {
         snoozedUntilUtc: snoozeTime,
       };
 
+      console.log("[API][POST] Sending snooze payload:", payload);
       fetch(
         "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
         {
@@ -52,15 +64,22 @@ export default function SettingsTab() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
-      ).then(() => {
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
-      });
+      )
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          console.log("[API][POST] Snooze updated successfully");
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+        })
+        .catch((err) => console.error("[API][POST] Failed to update snooze:", err));
     }
   };
 
   const handleSave = () => {
-    if (!objectId) return;
+    if (!objectId) {
+      console.warn("[SAVE] objectId is missing. Cannot save.");
+      return;
+    }
 
     const payload = {
       objectId,
@@ -68,6 +87,7 @@ export default function SettingsTab() {
       snoozedUntilUtc: snoozedUntil,
     };
 
+    console.log("[API][POST] Saving settings:", payload);
     fetch(
       "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
       {
@@ -75,10 +95,14 @@ export default function SettingsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       }
-    ).then(() => {
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-    });
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        console.log("[API][POST] Settings saved successfully");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      })
+      .catch((err) => console.error("[API][POST] Failed to save settings:", err));
   };
 
   const formatDateTime = (datetime) => {
@@ -104,7 +128,13 @@ export default function SettingsTab() {
           className={
             notificationsEnabled ? "toggle-button on" : "toggle-button off"
           }
-          onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+          onClick={() => {
+            console.log(
+              "[TOGGLE] Notifications toggled to",
+              !notificationsEnabled
+            );
+            setNotificationsEnabled(!notificationsEnabled);
+          }}
         >
           {notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
