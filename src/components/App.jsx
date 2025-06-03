@@ -1,54 +1,36 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SettingsTab from './SettingsTab';
 import ResourcesTab from './ResourcesTab';
 import HistoryTab from './HistoryTab';
-import './App.css'; // Include the stylesheet
+import { app as teamsApp } from '@microsoft/teams-js';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('settings');
+  const [isInTeams, setIsInTeams] = useState(true);
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case 'settings':
-        return <SettingsTab />;
-      case 'resources':
-        return <ResourcesTab />;
-      case 'history':
-        return <HistoryTab />;
-      default:
-        return <SettingsTab />;
-    }
-  };
+  useEffect(() => {
+    teamsApp.initialize()
+      .then(() => teamsApp.getContext())
+      .catch(() => setIsInTeams(false));
+  }, []);
+
+  if (!isInTeams) {
+    return (
+      <div style={{ padding: '2rem', fontSize: '1.2rem', color: 'darkred' }}>
+        ⚠️ This app must be opened inside Microsoft Teams.<br />
+        Please open the Wellbeing app from the Teams sidebar.
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <header className="app-header">
-        <div className="header-inner">
-          <img src="/logo.png" alt="UBS Logo" className="header-logo" />
-          <h1 className="header-title">Well-being Hub</h1>
-        </div>
-        <nav className="app-nav">
-          <button
-            className={activeTab === 'settings' ? 'tab-button active' : 'tab-button'}
-            onClick={() => setActiveTab('settings')}
-          >
-            My Alerts
-          </button>
-          <button
-            className={activeTab === 'resources' ? 'tab-button active' : 'tab-button'}
-            onClick={() => setActiveTab('resources')}
-          >
-            Well-being Resources
-          </button>
-          <button
-            className={activeTab === 'history' ? 'tab-button active' : 'tab-button'}
-            onClick={() => setActiveTab('history')}
-          >
-            History
-          </button>
-        </nav>
-      </header>
-      <main className="app-main">{renderTab()}</main>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/alerts" element={<SettingsTab />} />
+        <Route path="/resources" element={<ResourcesTab />} />
+        <Route path="/history" element={<HistoryTab />} />
+        <Route path="*" element={<SettingsTab />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
