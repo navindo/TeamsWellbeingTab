@@ -28,11 +28,7 @@ export default function SettingsTab() {
             setAuthToken(token);
             setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
 
-            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              }
-            })
+            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
               .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
@@ -65,8 +61,8 @@ export default function SettingsTab() {
   };
 
   const updateSettings = async (newSettings) => {
-    if (!objectId || !authToken) {
-      setDebugLog((prev) => prev + "\n[Error] No objectId or token. Cannot update settings.");
+    if (!objectId) {
+      setDebugLog((prev) => prev + "\n[Error] No objectId. Cannot update settings.");
       return false;
     }
 
@@ -85,8 +81,7 @@ export default function SettingsTab() {
       const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload),
       });
