@@ -16,32 +16,40 @@ export default function SettingsTab() {
   useEffect(() => {
     microsoftTeams.app
       .initialize()
-      .then(() => microsoftTeams.app.getContext())
-      .then((context) => {
-        const id = context.user?.aadObjectId;
-        setObjectId(id);
-        setDebugLog((prev) => prev + `\n[Teams] Context initialized for objectId=${id}`);
+      .then(() => {
+        setDebugLog((prev) => prev + "\n[Teams] SDK initialized. Requesting auth token...");
 
-        if (id) {
-          fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`)
-            .then((res) => {
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              return res.json();
-            })
-            .then((data) => {
-              setNotificationsEnabled(data.notificationsEnabled);
-              setSnoozedUntil(data.snoozedUntilUtc);
-              setDndFrom(data.dndStart || "22:00");
-              setDndTo(data.dndEnd || "07:00");
-              setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
-            })
-            .catch((err) => {
-              setDebugLog((prev) => prev + "\n[Error] Failed to load settings: " + err.message);
-            });
-        }
+        microsoftTeams.authentication.getAuthToken({
+          successCallback: (token) => {
+            const decoded = parseJwt(token);
+            const objectId = decoded.oid;
+            setObjectId(objectId);
+            setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
+
+            // Fetch settings once objectId is available
+            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
+              .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+              })
+              .then((data) => {
+                setNotificationsEnabled(data.notificationsEnabled);
+                setSnoozedUntil(data.snoozedUntilUtc);
+                setDndFrom(data.dndStart || "22:00");
+                setDndTo(data.dndEnd || "07:00");
+                setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
+              })
+              .catch((err) => {
+                setDebugLog((prev) => prev + "\n[Error] Failed to load settings: " + err.message);
+              });
+          },
+          failureCallback: (err) => {
+            setDebugLog((prev) => prev + `\n[Error] getAuthToken failed: ${err}`);
+          }
+        });
       })
       .catch((err) => {
-        setDebugLog((prev) => prev + "\n[Error] Teams SDK init error: " + err.message);
+        setDebugLog((prev) => prev + "\n[Error] Teams SDK init failed: " + err.message);
       });
   }, []);
 
@@ -217,4 +225,16 @@ function generateTimeOptions() {
     );
   }
   return options;
+}
+
+function parseJwt(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(base64).split('').map(function (c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(json);
+  } catch (e) {
+    return {};
+  }
 }
