@@ -11,7 +11,7 @@ export default function SettingsTab() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toggleLoading, setToggleLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     microsoftTeams.app
@@ -35,13 +35,18 @@ export default function SettingsTab() {
             })
             .catch((err) => {
               console.error("Failed to fetch settings:", err);
-              setToastMessage("Failed to load settings.");
-              setShowToast(true);
+              showToastMessage("Failed to load settings.");
             });
         }
       })
       .catch((err) => console.error("Teams SDK error:", err));
   }, []);
+
+  const showToastMessage = (msg) => {
+    setToastMessage(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const updateSettings = async (newSettings) => {
     if (!objectId) return;
@@ -55,42 +60,52 @@ export default function SettingsTab() {
       ...newSettings,
     };
 
-    try {
-      const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setToastMessage("Settings updated.");
-    } catch (err) {
-      console.error("Failed to update settings:", err);
-      setToastMessage("Update failed.");
-    } finally {
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   };
 
   const handleToggleNotifications = async () => {
     const newValue = !notificationsEnabled;
-    setNotificationsEnabled(newValue);
     setToggleLoading(true);
-    await updateSettings({ notificationsEnabled: newValue });
+
+    try {
+      await updateSettings({ notificationsEnabled: newValue });
+      setNotificationsEnabled(newValue);
+      showToastMessage("Notification setting updated.");
+    } catch (err) {
+      console.error("Update failed:", err);
+      showToastMessage("Failed to update.");
+    }
+
     setToggleLoading(false);
   };
 
   const handleSnooze = async (hours) => {
     const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setSnoozedUntil(snoozeTime);
-    await updateSettings({ snoozedUntilUtc: snoozeTime });
+    try {
+      await updateSettings({ snoozedUntilUtc: snoozeTime });
+      showToastMessage(`Snoozed for ${hours}h.`);
+    } catch {
+      showToastMessage("Snooze failed.");
+    }
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
-    await updateSettings({});
-    setIsSaving(false);
+    setSaveLoading(true);
+    try {
+      await updateSettings({});
+      showToastMessage("Saved.");
+    } catch (err) {
+      console.error("Save error:", err);
+      showToastMessage("Save failed.");
+    }
+    setSaveLoading(false);
   };
 
   const formatDateTime = (datetime) => {
@@ -107,17 +122,17 @@ export default function SettingsTab() {
 
   return (
     <div className="settings-container">
-      <h2 className="settings-title">My Alert Settings</h2>
+      <h2 className="settings-title">🔔 My Alert Settings</h2>
 
       <div className="card">
-        <h3>Notifications_what</h3>
+        <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
         <button
           className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
           onClick={handleToggleNotifications}
           disabled={toggleLoading}
         >
-          {toggleLoading ? <span className="spinner" /> : notificationsEnabled ? "Enabled" : "Disabled"}
+          {toggleLoading ? "Updating..." : notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
       </div>
 
@@ -133,8 +148,8 @@ export default function SettingsTab() {
             {generateTimeOptions()}
           </select>
         </div>
-        <button className="save-button" onClick={handleSave} disabled={isSaving}>
-          {isSaving ? <span className="spinner" /> : "Save"}
+        <button className="save-button" onClick={handleSave} disabled={saveLoading}>
+          {saveLoading ? "Saving..." : "Save"}
         </button>
       </div>
 
