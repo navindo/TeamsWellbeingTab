@@ -11,6 +11,7 @@ export default function SettingsTab() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [debugLog, setDebugLog] = useState("");
 
   useEffect(() => {
     microsoftTeams.app
@@ -31,14 +32,14 @@ export default function SettingsTab() {
               setSnoozedUntil(data.snoozedUntilUtc);
               setDndFrom(data.dndStart || "22:00");
               setDndTo(data.dndEnd || "07:00");
+              setDebugLog("Initial settings loaded successfully.");
             })
             .catch((err) => {
-              console.error("Failed to fetch settings:", err);
-              showToastMessage("Failed to load settings.");
+              setDebugLog("Failed to load settings:\n" + err.message);
             });
         }
       })
-      .catch((err) => console.error("Teams SDK error:", err));
+      .catch((err) => setDebugLog("Teams SDK init error:\n" + err.message));
   }, []);
 
   const showToastMessage = (msg) => {
@@ -48,7 +49,10 @@ export default function SettingsTab() {
   };
 
   const updateSettings = async (newSettings) => {
-    if (!objectId) return;
+    if (!objectId) {
+      setDebugLog("No objectId available. Cannot update settings.");
+      return false;
+    }
 
     const payload = {
       objectId,
@@ -59,32 +63,37 @@ export default function SettingsTab() {
       ...newSettings,
     };
 
-    console.log("Sending payload:", payload);
+    setDebugLog("Sending settings to backend:\n" + JSON.stringify(payload, null, 2));
 
-    const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch(
+        "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
-    const result = await res.text();
-    console.log("API Response:", result);
+      const responseText = await res.text();
+      setDebugLog((prev) => prev + `\n\nResponse ${res.status}:\n${responseText}`);
 
-    if (!res.ok) throw new Error(`HTTP ${res.status} - ${result}`);
-    return result;
+      if (!res.ok) throw new Error(`HTTP ${res.status} - ${responseText}`);
+      return true;
+    } catch (err) {
+      setDebugLog("Update failed:\n" + err.message);
+      return false;
+    }
   };
 
   const handleToggleNotifications = async () => {
     const newValue = !notificationsEnabled;
     setToggleLoading(true);
 
-    try {
-      await updateSettings({ notificationsEnabled: newValue });
+    const success = await updateSettings({ notificationsEnabled: newValue });
+    if (success) {
       setNotificationsEnabled(newValue);
       showToastMessage("Notification setting updated.");
-    } catch (err) {
-      console.error("Toggle failed:", err);
-      showToastMessage("Failed to update notifications.");
     }
 
     setToggleLoading(false);
@@ -93,23 +102,14 @@ export default function SettingsTab() {
   const handleSnooze = async (hours) => {
     const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setSnoozedUntil(snoozeTime);
-    try {
-      await updateSettings({ snoozedUntilUtc: snoozeTime });
-      showToastMessage(`Snoozed for ${hours}h`);
-    } catch (err) {
-      console.error("Snooze failed:", err);
-      showToastMessage("Failed to snooze alerts.");
-    }
+
+    const success = await updateSettings({ snoozedUntilUtc: snoozeTime });
+    if (success) showToastMessage(`Snoozed for ${hours}h`);
   };
 
   const handleSave = async () => {
-    try {
-      await updateSettings({});
-      showToastMessage("DND settings updated.");
-    } catch (err) {
-      console.error("Save failed:", err);
-      showToastMessage("Failed to update DND.");
-    }
+    const success = await updateSettings({});
+    if (success) showToastMessage("DND settings updated.");
   };
 
   const formatDateTime = (datetime) => {
@@ -171,6 +171,10 @@ export default function SettingsTab() {
       </div>
 
       {showToast && <div className="toast">{toastMessage}</div>}
+
+      {debugLog && (
+        <pre className="debug-log">{debugLog}</pre>
+      )}
     </div>
   );
 }
