@@ -107,10 +107,10 @@ export default function SettingsTab() {
 
   return (
     <div className="settings-container">
-      <h2 className="settings-title">🔔 My Alert Settings</h2>
+      <h2 className="settings-title">My Alert Settings</h2>
 
       <div className="card">
-        <h3>Notifications</h3>
+        <h3>Notifications_what</h3>
         <p>Toggle all alerts on or off.</p>
         <button
           className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
