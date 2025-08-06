@@ -163,3 +163,17 @@ select {
   color: #777;
   margin-top: 10px;
 }
+
+.debug-log {
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  padding: 12px;
+  margin-top: 20px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: #333;
+  border-radius: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
