@@ -9,100 +9,84 @@ export default function SettingsTab() {
   const [dndTo, setDndTo] = useState("07:00");
   const [snoozedUntil, setSnoozedUntil] = useState(null);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   useEffect(() => {
-    console.log("[INIT] Initializing Teams SDK...");
     microsoftTeams.app
       .initialize()
-      .then(() => {
-        console.log("[INIT] Teams SDK initialized.");
-        return microsoftTeams.app.getContext();
-      })
+      .then(() => microsoftTeams.app.getContext())
       .then((context) => {
         const id = context.user?.aadObjectId;
-        console.log("[TeamsContext] Retrieved AAD objectId:", id);
         setObjectId(id);
 
         if (id) {
-          const url = `https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`;
-          console.log("[API][GET] Fetching user settings from:", url);
-          fetch(url)
+          fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`)
             .then((res) => {
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               return res.json();
             })
             .then((data) => {
-              console.log("[API][GET] Settings received:", data);
               setNotificationsEnabled(data.notificationsEnabled);
               setSnoozedUntil(data.snoozedUntilUtc);
+              setDndFrom(data.dndStart || "22:00");
+              setDndTo(data.dndEnd || "07:00");
             })
-            .catch((err) =>
-              console.error("[API][GET] Failed to fetch settings:", err)
-            );
+            .catch((err) => {
+              console.error("Failed to fetch settings:", err);
+              setToastMessage("Failed to load settings.");
+              setShowToast(true);
+            });
         }
       })
-      .catch((err) => console.error("[INIT] Teams SDK error:", err));
+      .catch((err) => console.error("Teams SDK error:", err));
   }, []);
 
-  const handleSnooze = (hours) => {
-    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-    console.log(`[SNOOZE] Setting snooze for ${hours} hours → ${snoozeTime}`);
-    setSnoozedUntil(snoozeTime);
-
-    if (objectId) {
-      const payload = {
-        objectId,
-        notificationsEnabled,
-        snoozedUntilUtc: snoozeTime,
-      };
-
-      console.log("[API][POST] Sending snooze payload:", payload);
-      fetch(
-        "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      )
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          console.log("[API][POST] Snooze updated successfully");
-          setShowToast(true);
-          setTimeout(() => setShowToast(false), 3000);
-        })
-        .catch((err) => console.error("[API][POST] Failed to update snooze:", err));
-    }
-  };
-
-  const handleSave = () => {
-    if (!objectId) {
-      console.warn("[SAVE] objectId is missing. Cannot save.");
-      return;
-    }
-
+  const updateSettings = async (newSettings) => {
+    if (!objectId) return;
     const payload = {
       objectId,
       notificationsEnabled,
       snoozedUntilUtc: snoozedUntil,
+      dndStart: dndFrom,
+      dndEnd: dndTo,
+      ...newSettings,
     };
 
-    console.log("[API][POST] Saving settings:", payload);
-    fetch(
-      "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
-      {
+    try {
+      const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      }
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        console.log("[API][POST] Settings saved successfully");
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
-      })
-      .catch((err) => console.error("[API][POST] Failed to save settings:", err));
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      setToastMessage("Settings updated.");
+      setShowToast(true);
+    } catch (err) {
+      console.error("Failed to update settings:", err);
+      setToastMessage("Update failed.");
+      setShowToast(true);
+    }
+  };
+
+  const handleToggleNotifications = async () => {
+    const newValue = !notificationsEnabled;
+    setNotificationsEnabled(newValue);
+    setToggleLoading(true);
+    await updateSettings({ notificationsEnabled: newValue });
+    setToggleLoading(false);
+  };
+
+  const handleSnooze = async (hours) => {
+    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    setSnoozedUntil(snoozeTime);
+    await updateSettings({ snoozedUntilUtc: snoozeTime });
+  };
+
+  const handleSave = async () => {
+    await updateSettings({});
   };
 
   const formatDateTime = (datetime) => {
@@ -125,22 +109,15 @@ export default function SettingsTab() {
         <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
         <button
-          className={
-            notificationsEnabled ? "toggle-button on" : "toggle-button off"
-          }
-          onClick={() => {
-            console.log(
-              "[TOGGLE] Notifications toggled to",
-              !notificationsEnabled
-            );
-            setNotificationsEnabled(!notificationsEnabled);
-          }}
+          className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
+          onClick={handleToggleNotifications}
+          disabled={toggleLoading}
         >
-          {notificationsEnabled ? "Enabled" : "Disabled"}
+          {toggleLoading ? "Saving..." : notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
       </div>
 
-      <div className="card" style={{ position: "relative" }}>
+      <div className="card">
         <h3>Do Not Disturb</h3>
         <p>Set quiet hours to suppress alerts automatically.</p>
         <div className="time-selectors">
@@ -152,12 +129,9 @@ export default function SettingsTab() {
             {generateTimeOptions()}
           </select>
         </div>
-
         <button className="save-button" onClick={handleSave}>
           Save
         </button>
-
-        {showToast && <div className="toast">Settings saved successfully</div>}
       </div>
 
       <div className="card">
@@ -169,11 +143,11 @@ export default function SettingsTab() {
           <button onClick={() => handleSnooze(24)}>24h</button>
         </div>
         {snoozedUntil && (
-          <p className="info-text">
-            Snoozed until: {formatDateTime(snoozedUntil)}
-          </p>
+          <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>
         )}
       </div>
+
+      {showToast && <div className="toast">{toastMessage}</div>}
     </div>
   );
 }
