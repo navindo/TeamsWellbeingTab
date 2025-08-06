@@ -20,6 +20,7 @@ export default function SettingsTab() {
       .then((context) => {
         const id = context.user?.aadObjectId;
         setObjectId(id);
+        setDebugLog((prev) => prev + `\n[Teams] Context initialized for objectId=${id}`);
 
         if (id) {
           fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${id}`)
@@ -32,14 +33,16 @@ export default function SettingsTab() {
               setSnoozedUntil(data.snoozedUntilUtc);
               setDndFrom(data.dndStart || "22:00");
               setDndTo(data.dndEnd || "07:00");
-              setDebugLog("Initial settings loaded successfully.");
+              setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
             })
             .catch((err) => {
-              setDebugLog("Failed to load settings:\n" + err.message);
+              setDebugLog((prev) => prev + "\n[Error] Failed to load settings: " + err.message);
             });
         }
       })
-      .catch((err) => setDebugLog("Teams SDK init error:\n" + err.message));
+      .catch((err) => {
+        setDebugLog((prev) => prev + "\n[Error] Teams SDK init error: " + err.message);
+      });
   }, []);
 
   const showToastMessage = (msg) => {
@@ -50,7 +53,7 @@ export default function SettingsTab() {
 
   const updateSettings = async (newSettings) => {
     if (!objectId) {
-      setDebugLog("No objectId available. Cannot update settings.");
+      setDebugLog((prev) => prev + "\n[Error] No objectId. Cannot update settings.");
       return false;
     }
 
@@ -63,7 +66,7 @@ export default function SettingsTab() {
       ...newSettings,
     };
 
-    setDebugLog("Sending settings to backend:\n" + JSON.stringify(payload, null, 2));
+    setDebugLog((prev) => prev + "\n[Request] Sending settings:\n" + JSON.stringify(payload, null, 2));
 
     try {
       const res = await fetch(
@@ -76,17 +79,18 @@ export default function SettingsTab() {
       );
 
       const responseText = await res.text();
-      setDebugLog((prev) => prev + `\n\nResponse ${res.status}:\n${responseText}`);
+      setDebugLog((prev) => prev + `\n[Response ${res.status}]\n${responseText}`);
 
       if (!res.ok) throw new Error(`HTTP ${res.status} - ${responseText}`);
       return true;
     } catch (err) {
-      setDebugLog("Update failed:\n" + err.message);
+      setDebugLog((prev) => prev + "\n[Error] Update failed: " + err.message);
       return false;
     }
   };
 
   const handleToggleNotifications = async () => {
+    setDebugLog((prev) => prev + "\n[UI] Toggle Notifications button clicked");
     const newValue = !notificationsEnabled;
     setToggleLoading(true);
 
@@ -94,22 +98,39 @@ export default function SettingsTab() {
     if (success) {
       setNotificationsEnabled(newValue);
       showToastMessage("Notification setting updated.");
+      setDebugLog((prev) => prev + "\n[UI] Notifications toggled successfully");
+    } else {
+      setDebugLog((prev) => prev + "\n[UI] Notification toggle failed");
     }
 
     setToggleLoading(false);
   };
 
   const handleSnooze = async (hours) => {
+    setDebugLog((prev) => prev + `\n[UI] Snooze ${hours}h clicked`);
+
     const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setSnoozedUntil(snoozeTime);
 
     const success = await updateSettings({ snoozedUntilUtc: snoozeTime });
-    if (success) showToastMessage(`Snoozed for ${hours}h`);
+    if (success) {
+      showToastMessage(`Snoozed for ${hours}h`);
+      setDebugLog((prev) => prev + `\n[UI] Snoozed until ${snoozeTime}`);
+    } else {
+      setDebugLog((prev) => prev + "\n[UI] Snooze failed");
+    }
   };
 
   const handleSave = async () => {
+    setDebugLog((prev) => prev + "\n[UI] Save DND clicked");
+
     const success = await updateSettings({});
-    if (success) showToastMessage("DND settings updated.");
+    if (success) {
+      showToastMessage("DND settings updated.");
+      setDebugLog((prev) => prev + "\n[UI] DND settings updated successfully");
+    } else {
+      setDebugLog((prev) => prev + "\n[UI] DND update failed");
+    }
   };
 
   const formatDateTime = (datetime) => {
@@ -144,11 +165,17 @@ export default function SettingsTab() {
         <h3>Do Not Disturb</h3>
         <p>Set quiet hours to suppress alerts automatically.</p>
         <div className="time-selectors">
-          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)}>
+          <select value={dndFrom} onChange={(e) => {
+            setDndFrom(e.target.value);
+            setDebugLog((prev) => prev + `\n[UI] DND From changed to ${e.target.value}`);
+          }}>
             {generateTimeOptions()}
           </select>
           <span>to</span>
-          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>
+          <select value={dndTo} onChange={(e) => {
+            setDndTo(e.target.value);
+            setDebugLog((prev) => prev + `\n[UI] DND To changed to ${e.target.value}`);
+          }}>
             {generateTimeOptions()}
           </select>
         </div>
