@@ -11,6 +11,7 @@ export default function SettingsTab() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     microsoftTeams.app
@@ -44,6 +45,7 @@ export default function SettingsTab() {
 
   const updateSettings = async (newSettings) => {
     if (!objectId) return;
+
     const payload = {
       objectId,
       notificationsEnabled,
@@ -61,13 +63,13 @@ export default function SettingsTab() {
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       setToastMessage("Settings updated.");
-      setShowToast(true);
     } catch (err) {
       console.error("Failed to update settings:", err);
       setToastMessage("Update failed.");
+    } finally {
       setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     }
   };
 
@@ -86,7 +88,9 @@ export default function SettingsTab() {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     await updateSettings({});
+    setIsSaving(false);
   };
 
   const formatDateTime = (datetime) => {
@@ -113,7 +117,7 @@ export default function SettingsTab() {
           onClick={handleToggleNotifications}
           disabled={toggleLoading}
         >
-          {toggleLoading ? "Saving..." : notificationsEnabled ? "Enabled" : "Disabled"}
+          {toggleLoading ? <span className="spinner" /> : notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
       </div>
 
@@ -129,8 +133,8 @@ export default function SettingsTab() {
             {generateTimeOptions()}
           </select>
         </div>
-        <button className="save-button" onClick={handleSave}>
-          Save
+        <button className="save-button" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? <span className="spinner" /> : "Save"}
         </button>
       </div>
 
