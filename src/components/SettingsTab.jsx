@@ -11,7 +11,6 @@ export default function SettingsTab() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toggleLoading, setToggleLoading] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     microsoftTeams.app
@@ -60,13 +59,19 @@ export default function SettingsTab() {
       ...newSettings,
     };
 
+    console.log("Sending payload:", payload);
+
     const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await res.text();
+    console.log("API Response:", result);
+
+    if (!res.ok) throw new Error(`HTTP ${res.status} - ${result}`);
+    return result;
   };
 
   const handleToggleNotifications = async () => {
@@ -78,8 +83,8 @@ export default function SettingsTab() {
       setNotificationsEnabled(newValue);
       showToastMessage("Notification setting updated.");
     } catch (err) {
-      console.error("Update failed:", err);
-      showToastMessage("Failed to update.");
+      console.error("Toggle failed:", err);
+      showToastMessage("Failed to update notifications.");
     }
 
     setToggleLoading(false);
@@ -90,22 +95,21 @@ export default function SettingsTab() {
     setSnoozedUntil(snoozeTime);
     try {
       await updateSettings({ snoozedUntilUtc: snoozeTime });
-      showToastMessage(`Snoozed for ${hours}h.`);
-    } catch {
-      showToastMessage("Snooze failed.");
+      showToastMessage(`Snoozed for ${hours}h`);
+    } catch (err) {
+      console.error("Snooze failed:", err);
+      showToastMessage("Failed to snooze alerts.");
     }
   };
 
   const handleSave = async () => {
-    setSaveLoading(true);
     try {
       await updateSettings({});
-      showToastMessage("Saved.");
+      showToastMessage("DND settings updated.");
     } catch (err) {
-      console.error("Save error:", err);
-      showToastMessage("Save failed.");
+      console.error("Save failed:", err);
+      showToastMessage("Failed to update DND.");
     }
-    setSaveLoading(false);
   };
 
   const formatDateTime = (datetime) => {
@@ -128,7 +132,7 @@ export default function SettingsTab() {
         <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
         <button
-          className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
+          className={`toggle-button ${notificationsEnabled ? "on" : "off"} ${toggleLoading ? "loading" : ""}`}
           onClick={handleToggleNotifications}
           disabled={toggleLoading}
         >
@@ -148,8 +152,8 @@ export default function SettingsTab() {
             {generateTimeOptions()}
           </select>
         </div>
-        <button className="save-button" onClick={handleSave} disabled={saveLoading}>
-          {saveLoading ? "Saving..." : "Save"}
+        <button className="save-button" onClick={handleSave}>
+          Save
         </button>
       </div>
 
