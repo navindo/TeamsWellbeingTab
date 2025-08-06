@@ -4,6 +4,7 @@ import "./SettingsTab.css";
 
 export default function SettingsTab() {
   const [objectId, setObjectId] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [dndFrom, setDndFrom] = useState("22:00");
   const [dndTo, setDndTo] = useState("07:00");
@@ -24,10 +25,14 @@ export default function SettingsTab() {
             const decoded = parseJwt(token);
             const objectId = decoded.oid;
             setObjectId(objectId);
+            setAuthToken(token);
             setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
 
-            // Fetch settings once objectId is available
-            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
+            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              }
+            })
               .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
@@ -60,8 +65,8 @@ export default function SettingsTab() {
   };
 
   const updateSettings = async (newSettings) => {
-    if (!objectId) {
-      setDebugLog((prev) => prev + "\n[Error] No objectId. Cannot update settings.");
+    if (!objectId || !authToken) {
+      setDebugLog((prev) => prev + "\n[Error] No objectId or token. Cannot update settings.");
       return false;
     }
 
@@ -77,14 +82,14 @@ export default function SettingsTab() {
     setDebugLog((prev) => prev + "\n[Request] Sending settings:\n" + JSON.stringify(payload, null, 2));
 
     try {
-      const res = await fetch(
-        "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const responseText = await res.text();
       setDebugLog((prev) => prev + `\n[Response ${res.status}]\n${responseText}`);
@@ -206,10 +211,7 @@ export default function SettingsTab() {
       </div>
 
       {showToast && <div className="toast">{toastMessage}</div>}
-
-      {debugLog && (
-        <pre className="debug-log">{debugLog}</pre>
-      )}
+      {debugLog && <pre className="debug-log">{debugLog}</pre>}
     </div>
   );
 }
