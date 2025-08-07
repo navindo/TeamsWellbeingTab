@@ -41,7 +41,16 @@ export default function SettingsTab() {
                 setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
               })
               .catch((err) => {
-                setDebugLog((prev) => prev + "\n[Error] Failed to load settings: " + err.message);
+                const errorDetails = [
+                  "[Error] Failed to load settings",
+                  `Message: ${err.message}`,
+                  `Stack: ${err.stack}`,
+                  `Location: ${window.location.href}`,
+                  `Navigator Online: ${navigator.onLine}`,
+                  `ObjectId: ${objectId}`
+                ].join("\n");
+
+                setDebugLog((prev) => prev + "\n" + errorDetails);
               });
           },
           failureCallback: (err) => {
@@ -87,12 +96,25 @@ export default function SettingsTab() {
       });
 
       const responseText = await res.text();
-      setDebugLog((prev) => prev + `\n[Response ${res.status}]\n${responseText}`);
+      setDebugLog((prev) => prev +
+        `\n[Response Status] ${res.status}` +
+        `\n[Response Headers]\n${JSON.stringify(Object.fromEntries(res.headers.entries()), null, 2)}` +
+        `\n[Response Body]\n${responseText}`
+      );
 
       if (!res.ok) throw new Error(`HTTP ${res.status} - ${responseText}`);
       return true;
     } catch (err) {
-      setDebugLog((prev) => prev + "\n[Error] Update failed: " + err.message);
+      const errorDetails = [
+        "[Error] Update failed",
+        `Message: ${err.message}`,
+        `Stack: ${err.stack}`,
+        `Location: ${window.location.href}`,
+        `Navigator Online: ${navigator.onLine}`,
+        `Payload: ${JSON.stringify(payload, null, 2)}`
+      ].join("\n");
+
+      setDebugLog((prev) => prev + "\n" + errorDetails);
       return false;
     }
   };
