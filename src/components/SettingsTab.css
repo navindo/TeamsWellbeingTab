@@ -55,7 +55,8 @@
   color: black;
 }
 
-.toggle-button:disabled {
+.toggle-button:disabled,
+.toggle-button.saving {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -71,7 +72,7 @@
   cursor: pointer;
   position: relative;
   transition: background-color 0.2s ease;
-  margin-top: 10px;
+  margin-top: 16px;
 }
 
 .save-button:hover {
@@ -235,11 +236,17 @@ select {
   color: #555;
 }
 
-
 /* DND radio toggle */
 .dnd-toggle {
   display: flex;
   gap: 20px;
   margin-bottom: 12px;
   font-size: 14px;
+}
+
+/* Notification layout fix */
+.notification-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
