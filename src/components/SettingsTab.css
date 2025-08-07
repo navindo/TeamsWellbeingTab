@@ -33,6 +33,7 @@
   margin-bottom: 12px;
 }
 
+/* Toggle Button */
 .toggle-button {
   padding: 8px 16px;
   font-weight: bold;
@@ -74,10 +75,75 @@
 
 @keyframes spin {
   to {
-    transform: translateY(-50%) rotate(360deg);
+    transform: rotate(360deg);
   }
 }
 
+/* Save Button */
+.save-button {
+  background-color: #e0001b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+}
+
+.save-button:hover {
+  background-color: #d00018;
+}
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.save-button.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+
+.success-checkmark {
+  display: inline-block;
+  margin-left: 8px;
+  color: #28a745;
+  font-weight: bold;
+  font-size: 16px;
+  opacity: 1;
+  animation: fadeAndRise 2s ease forwards;
+}
+
+@keyframes fadeAndRise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Toast */
 .toast {
   position: fixed;
   bottom: 30px;
@@ -117,25 +183,7 @@
   }
 }
 
-
-@keyframes fadeAndRise {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 8px);
-  }
-  10% {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -4px);
-  }
-}
-
+/* Time selectors */
 .time-selectors {
   display: flex;
   align-items: center;
@@ -149,20 +197,7 @@ select {
   border: 1px solid #ccc;
 }
 
-.save-button {
-  background-color: #e0001b;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  font-weight: bold;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.save-button:hover {
-  background-color: #e0001b;
-}
-
+/* Snooze buttons */
 .snooze-buttons button {
   margin-right: 10px;
   padding: 8px 14px;
@@ -178,6 +213,7 @@ select {
   background-color: #fce6e9;
 }
 
+/* Other */
 .info-text {
   font-size: 13px;
   color: #777;
@@ -202,31 +238,4 @@ select {
   margin-top: 40px;
   font-size: 16px;
   color: #555;
-}
-
-.save-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.save-button.loading {
-  position: relative;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-.loading-spinner {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid white;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }

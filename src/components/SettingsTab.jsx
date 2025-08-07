@@ -1,4 +1,3 @@
-// (NO CHANGE TO IMPORTS)
 import React, { useState, useEffect } from "react";
 import * as microsoftTeams from "@microsoft/teams-js";
 import "./SettingsTab.css";
@@ -13,11 +12,13 @@ export default function SettingsTab() {
   const [snoozedUntil, setSnoozedUntil] = useState(null);
 
   const [settingsLoading, setSettingsLoading] = useState(true);
-  const [toggleLoading, setToggleLoading] = useState(false);
-  const [dndLoading, setDndLoading] = useState(false);
-  const [snoozeLoading, setSnoozeLoading] = useState(false);
-
   const [debugLog, setDebugLog] = useState("");
+
+  const [loadingStatus, setLoadingStatus] = useState({
+    notifications: "idle", // idle | loading | success
+    snooze: "idle",
+    dnd: "idle",
+  });
 
   useEffect(() => {
     microsoftTeams.app.initialize().then(() => {
@@ -65,10 +66,7 @@ export default function SettingsTab() {
   }, []);
 
   const updateSettings = async (newSettings) => {
-    if (!objectId) {
-      setDebugLog((prev) => prev + "\n[Error] No objectId. Cannot update settings.");
-      return false;
-    }
+    if (!objectId) return false;
 
     const payload = {
       objectId,
@@ -94,107 +92,61 @@ export default function SettingsTab() {
         `\n[Response Headers]\n${JSON.stringify(Object.fromEntries(res.headers.entries()), null, 2)}` +
         `\n[Response Body]\n${responseText}`);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status} - ${responseText}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return true;
     } catch (err) {
-      const errorDetails = [
-        "[Error] Update failed",
-        `Message: ${err.message}`,
-        `Stack: ${err.stack}`,
-        `Location: ${window.location.href}`,
-        `Navigator Online: ${navigator.onLine}`,
-        `Payload: ${JSON.stringify(payload, null, 2)}`
-      ].join("\n");
-
-      setDebugLog((prev) => prev + "\n" + errorDetails);
+      setDebugLog((prev) => prev + `\n[Error] Update failed: ${err.message}`);
       return false;
     }
   };
 
-  const handleSaveNotifications = async () => {
-    setDebugLog((prev) => prev + "\n[UI] Save Notification clicked");
-    setToggleLoading(true);
-    const success = await updateSettings({ notificationsEnabled });
-    if (success) {
-      setOriginalNotifications(notificationsEnabled);
-      setDebugLog((prev) => prev + "\n[UI] Notifications saved successfully");
-    } else {
-      setDebugLog((prev) => prev + "\n[UI] Notification update failed");
-    }
-    setTimeout(() => setToggleLoading(false), 10000);
-  };
-
-  const handleSaveSnooze = async () => {
-    setDebugLog((prev) => prev + `\n[UI] Save Snooze clicked`);
-    setSnoozeLoading(true);
-    const success = await updateSettings({ snoozedUntilUtc: snoozedUntil });
-    if (success) {
-      setDebugLog((prev) => prev + `\n[UI] Snooze updated successfully`);
-    } else {
-      setDebugLog((prev) => prev + "\n[UI] Snooze update failed");
-    }
-    setTimeout(() => setSnoozeLoading(false), 10000);
+  const runSave = async (key, newSettings) => {
+    setLoadingStatus((s) => ({ ...s, [key]: "loading" }));
+    const success = await updateSettings(newSettings);
+    if (key === "notifications" && success) setOriginalNotifications(notificationsEnabled);
+    setTimeout(() => {
+      setLoadingStatus((s) => ({ ...s, [key]: success ? "success" : "idle" }));
+    }, 10000);
   };
 
   const handleSnooze = (hours) => {
-    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    const snoozeTime = new Date(Date.now() + hours * 3600000).toISOString();
     setSnoozedUntil(snoozeTime);
     setDebugLog((prev) => prev + `\n[UI] SnoozedUntilUtc set to ${snoozeTime}`);
   };
 
-  const handleSaveDND = async () => {
-    setDebugLog((prev) => prev + "\n[UI] Save DND clicked");
-    setDndLoading(true);
-    const success = await updateSettings({});
-    if (success) {
-      setDebugLog((prev) => prev + "\n[UI] DND settings updated successfully");
-    } else {
-      setDebugLog((prev) => prev + "\n[UI] DND update failed");
-    }
-    setTimeout(() => setDndLoading(false), 10000);
-  };
+  const formatDateTime = (dt) => new Date(dt).toLocaleString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 
-  const formatDateTime = (datetime) => {
-    const date = new Date(datetime);
-    return date.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  if (settingsLoading) {
-    return <div className="settings-loading">Loading settings...</div>;
-  }
+  if (settingsLoading) return <div className="settings-loading">Loading settings...</div>;
 
   return (
     <div className="settings-container">
       <h2 className="settings-title">🔔 My Alert Settings</h2>
 
+      {/* Notifications */}
       <div className="card">
         <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
         <button
           className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
-          onClick={() => {
-            setDebugLog((prev) => prev + "\n[UI] Toggle clicked");
-            setNotificationsEnabled((prev) => !prev);
-          }}
+          onClick={() => setNotificationsEnabled((prev) => !prev)}
         >
           {notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
         <button
-          className={`save-button ${toggleLoading ? "loading" : ""}`}
-          onClick={handleSaveNotifications}
-          disabled={toggleLoading || notificationsEnabled === originalNotifications}
+          className={`save-button ${loadingStatus.notifications}`}
+          disabled={loadingStatus.notifications !== "idle" || notificationsEnabled === originalNotifications}
+          onClick={() => runSave("notifications", { notificationsEnabled })}
         >
-          {toggleLoading ? <span className="loading-spinner"></span> : "Save Notification"}
+          {loadingStatus.notifications === "loading" && <span className="loading-spinner"></span>}
+          {loadingStatus.notifications === "success" && "✅ Updated"}
+          {loadingStatus.notifications === "idle" && "Save Notification"}
         </button>
       </div>
 
+      {/* DND */}
       <div className="card">
         <h3>Do Not Disturb</h3>
         <p>Set quiet hours to suppress alerts automatically.</p>
@@ -204,14 +156,17 @@ export default function SettingsTab() {
           <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>{generateTimeOptions()}</select>
         </div>
         <button
-          className={`save-button ${dndLoading ? "loading" : ""}`}
-          onClick={handleSaveDND}
-          disabled={dndLoading}
+          className={`save-button ${loadingStatus.dnd}`}
+          onClick={() => runSave("dnd", { dndStart: dndFrom, dndEnd: dndTo })}
+          disabled={loadingStatus.dnd !== "idle"}
         >
-          {dndLoading ? <span className="loading-spinner"></span> : "Save"}
+          {loadingStatus.dnd === "loading" && <span className="loading-spinner"></span>}
+          {loadingStatus.dnd === "success" && "✅ Updated"}
+          {loadingStatus.dnd === "idle" && "Save"}
         </button>
       </div>
 
+      {/* Snooze */}
       <div className="card">
         <h3>Snooze Alerts</h3>
         <p>Pause notifications temporarily.</p>
@@ -222,11 +177,13 @@ export default function SettingsTab() {
         </div>
         {snoozedUntil && <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>}
         <button
-          className={`save-button ${snoozeLoading ? "loading" : ""}`}
-          onClick={handleSaveSnooze}
-          disabled={snoozeLoading}
+          className={`save-button ${loadingStatus.snooze}`}
+          onClick={() => runSave("snooze", { snoozedUntilUtc: snoozedUntil })}
+          disabled={loadingStatus.snooze !== "idle"}
         >
-          {snoozeLoading ? <span className="loading-spinner"></span> : "Save Snooze"}
+          {loadingStatus.snooze === "loading" && <span className="loading-spinner"></span>}
+          {loadingStatus.snooze === "success" && "✅ Updated"}
+          {loadingStatus.snooze === "idle" && "Save Snooze"}
         </button>
       </div>
 
@@ -238,8 +195,8 @@ export default function SettingsTab() {
 function generateTimeOptions() {
   const options = [];
   for (let h = 0; h < 24; h++) {
-    const value = `${h.toString().padStart(2, "0")}:00`;
-    options.push(<option value={value} key={value}>{value}</option>);
+    const v = `${h.toString().padStart(2, "0")}:00`;
+    options.push(<option key={v} value={v}>{v}</option>);
   }
   return options;
 }
