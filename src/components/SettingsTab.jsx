@@ -14,9 +14,9 @@ export default function SettingsTab() {
 
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [dndLoading, setDndLoading] = useState(false);
   const [snoozeLoading, setSnoozeLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+
   const [debugLog, setDebugLog] = useState("");
 
   useEffect(() => {
@@ -63,12 +63,6 @@ export default function SettingsTab() {
       });
     });
   }, []);
-
-  const showToastMessage = (msg) => {
-    setToastMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
 
   const updateSettings = async (newSettings) => {
     if (!objectId) {
@@ -123,12 +117,11 @@ export default function SettingsTab() {
     const success = await updateSettings({ notificationsEnabled });
     if (success) {
       setOriginalNotifications(notificationsEnabled);
-      showToastMessage("Notification setting updated.");
       setDebugLog((prev) => prev + "\n[UI] Notifications saved successfully");
     } else {
       setDebugLog((prev) => prev + "\n[UI] Notification update failed");
     }
-    setToggleLoading(false);
+    setTimeout(() => setToggleLoading(false), 10000);
   };
 
   const handleSaveSnooze = async () => {
@@ -136,12 +129,11 @@ export default function SettingsTab() {
     setSnoozeLoading(true);
     const success = await updateSettings({ snoozedUntilUtc: snoozedUntil });
     if (success) {
-      showToastMessage(`Snooze updated.`);
       setDebugLog((prev) => prev + `\n[UI] Snooze updated successfully`);
     } else {
       setDebugLog((prev) => prev + "\n[UI] Snooze update failed");
     }
-    setSnoozeLoading(false);
+    setTimeout(() => setSnoozeLoading(false), 10000);
   };
 
   const handleSnooze = (hours) => {
@@ -152,13 +144,14 @@ export default function SettingsTab() {
 
   const handleSaveDND = async () => {
     setDebugLog((prev) => prev + "\n[UI] Save DND clicked");
+    setDndLoading(true);
     const success = await updateSettings({});
     if (success) {
-      showToastMessage("DND settings updated.");
       setDebugLog((prev) => prev + "\n[UI] DND settings updated successfully");
     } else {
       setDebugLog((prev) => prev + "\n[UI] DND update failed");
     }
+    setTimeout(() => setDndLoading(false), 10000);
   };
 
   const formatDateTime = (datetime) => {
@@ -194,11 +187,11 @@ export default function SettingsTab() {
           {notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
         <button
-          className="save-button"
+          className={`save-button ${toggleLoading ? "loading" : ""}`}
           onClick={handleSaveNotifications}
           disabled={toggleLoading || notificationsEnabled === originalNotifications}
         >
-          {toggleLoading ? "Saving..." : "Save Notification"}
+          {toggleLoading ? <span className="loading-spinner"></span> : "Save Notification"}
         </button>
       </div>
 
@@ -210,7 +203,13 @@ export default function SettingsTab() {
           <span>to</span>
           <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>{generateTimeOptions()}</select>
         </div>
-        <button className="save-button" onClick={handleSaveDND}>Save</button>
+        <button
+          className={`save-button ${dndLoading ? "loading" : ""}`}
+          onClick={handleSaveDND}
+          disabled={dndLoading}
+        >
+          {dndLoading ? <span className="loading-spinner"></span> : "Save"}
+        </button>
       </div>
 
       <div className="card">
@@ -222,12 +221,15 @@ export default function SettingsTab() {
           <button onClick={() => handleSnooze(24)}>24h</button>
         </div>
         {snoozedUntil && <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>}
-        <button className="save-button" onClick={handleSaveSnooze} disabled={snoozeLoading}>
-          {snoozeLoading ? "Saving..." : "Save Snooze"}
+        <button
+          className={`save-button ${snoozeLoading ? "loading" : ""}`}
+          onClick={handleSaveSnooze}
+          disabled={snoozeLoading}
+        >
+          {snoozeLoading ? <span className="loading-spinner"></span> : "Save Snooze"}
         </button>
       </div>
 
-{showToast && <div className="toast">{toastMessage}</div>}
       {debugLog && <pre className="debug-log">{debugLog}</pre>}
     </div>
   );
