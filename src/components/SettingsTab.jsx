@@ -77,27 +77,27 @@ export default function SettingsTab() {
   };
 
   const updateSettingsWithRetry = async (settings, key) => {
-    const success = await updateSettings(settings);
-    if (success) return true;
-    const lastLog = debugLog.split('\n').pop();
-    if (lastLog.includes("Please try again later")) {
+    setLoadingStatus((s) => ({ ...s, [key]: "loading" }));
+    let success = await updateSettings(settings);
+    if (!success) {
       setDebugLog((prev) => prev + `\n[Retry] Waiting 2 mins and retrying update...`);
       await new Promise((resolve) => setTimeout(resolve, 120000));
-      return await updateSettings(settings);
+      success = await updateSettings(settings);
     }
-    return false;
+
+    if (success) {
+      setLoadingStatus((s) => ({ ...s, [key]: "success" }));
+      setTimeout(() => setLoadingStatus((s) => ({ ...s, [key]: "idle" })), 1500);
+    } else {
+      setLoadingStatus((s) => ({ ...s, [key]: "idle" }));
+    }
+
+    return success;
   };
 
   const runSave = async (key, newSettings) => {
-    setLoadingStatus((s) => ({ ...s, [key]: "loading" }));
     const success = await updateSettingsWithRetry(newSettings, key);
     if (key === "notifications" && success) setOriginalNotifications(notificationsEnabled);
-    if (success) {
-      setTimeout(() => setLoadingStatus((s) => ({ ...s, [key]: "success" })), 10);
-      setTimeout(() => setLoadingStatus((s) => ({ ...s, [key]: "idle" })), 1500);
-    } else {
-      setTimeout(() => setLoadingStatus((s) => ({ ...s, [key]: "idle" })), 10000);
-    }
   };
 
   const handleSnooze = (hours) => {
@@ -106,7 +106,16 @@ export default function SettingsTab() {
     setDebugLog((prev) => prev + `\n[UI] SnoozedUntilUtc set to ${snoozeTime}`);
   };
 
-  const formatDateTime = (dt) => new Date(dt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+  const formatDateTime = (dt) =>
+    new Date(dt).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
   if (settingsLoading) return <div className="settings-loading">Loading settings...</div>;
 
   return (
@@ -116,33 +125,56 @@ export default function SettingsTab() {
       <div className="card">
         <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
-        <button className={`toggle-button ${notificationsEnabled ? "on" : "off"}`} onClick={() => setNotificationsEnabled((prev) => !prev)} disabled={loadingStatus.notifications === "loading"}>
+        <button
+          className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
+          onClick={() => setNotificationsEnabled((prev) => !prev)}
+          disabled={loadingStatus.notifications === "loading"}
+        >
           {notificationsEnabled ? "Enabled" : "Disabled"}
         </button>
-        <button className={`save-button ${loadingStatus.notifications}`} disabled={loadingStatus.notifications === "loading" || notificationsEnabled === originalNotifications} onClick={() => runSave("notifications", { notificationsEnabled })}>
-          {loadingStatus.notifications === "loading" && <span className="loading-spinner"></span>}
-          {loadingStatus.notifications === "success" && "✅ Updated"}
-          {loadingStatus.notifications === "idle" && "Save"}
-          {loadingStatus.notifications === "loading" && "Updating..."}
-        </button>
+        <div>
+          <button
+            className={`save-button ${loadingStatus.notifications}`}
+            disabled={loadingStatus.notifications === "loading" || notificationsEnabled === originalNotifications}
+            onClick={() => runSave("notifications", { notificationsEnabled })}
+          >
+            {loadingStatus.notifications === "loading" && <span className="loading-spinner"></span>}
+            {loadingStatus.notifications === "success" && "✅ Updated"}
+            {loadingStatus.notifications === "idle" && "Save"}
+            {loadingStatus.notifications === "loading" && "Updating..."}
+          </button>
+        </div>
       </div>
 
       <div className="card">
         <h3>Do Not Disturb</h3>
         <p>Enable quiet hours to suppress alerts.</p>
         <div className="dnd-toggle">
-          <label><input type="radio" checked={dndEnabled} onChange={() => setDndEnabled(true)} /> Enable</label>
-          <label style={{ marginLeft: "20px" }}><input type="radio" checked={!dndEnabled} onChange={() => setDndEnabled(false)} /> Disable</label>
+          <label>
+            <input type="radio" checked={dndEnabled} onChange={() => setDndEnabled(true)} /> Enable
+          </label>
+          <label>
+            <input type="radio" checked={!dndEnabled} onChange={() => setDndEnabled(false)} /> Disable
+          </label>
         </div>
         <div className="time-selectors">
-          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)} disabled={!dndEnabled}>{generateTimeOptions()}</select>
+          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)} disabled={!dndEnabled}>
+            {generateTimeOptions()}
+          </select>
           <span>to</span>
-          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)} disabled={!dndEnabled}>{generateTimeOptions()}</select>
+          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)} disabled={!dndEnabled}>
+            {generateTimeOptions()}
+          </select>
         </div>
-        <button className={`save-button ${loadingStatus.dnd}`} onClick={() => runSave("dnd", { dndStart: dndEnabled ? dndFrom : "00:00", dndEnd: dndEnabled ? dndTo : "00:00" })} disabled={loadingStatus.dnd !== "idle"}>
+        <button
+          className={`save-button ${loadingStatus.dnd}`}
+          onClick={() => runSave("dnd", { dndStart: dndEnabled ? dndFrom : "00:00", dndEnd: dndEnabled ? dndTo : "00:00" })}
+          disabled={loadingStatus.dnd === "loading"}
+        >
           {loadingStatus.dnd === "loading" && <span className="loading-spinner"></span>}
           {loadingStatus.dnd === "success" && "✅ Updated"}
           {loadingStatus.dnd === "idle" && "Save"}
+          {loadingStatus.dnd === "loading" && "Updating..."}
         </button>
       </div>
 
@@ -155,10 +187,15 @@ export default function SettingsTab() {
           <button onClick={() => handleSnooze(24)}>24h</button>
         </div>
         {snoozedUntil && <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>}
-        <button className={`save-button ${loadingStatus.snooze}`} onClick={() => runSave("snooze", { snoozedUntilUtc: snoozedUntil })} disabled={loadingStatus.snooze !== "idle"}>
+        <button
+          className={`save-button ${loadingStatus.snooze}`}
+          onClick={() => runSave("snooze", { snoozedUntilUtc: snoozedUntil })}
+          disabled={loadingStatus.snooze === "loading"}
+        >
           {loadingStatus.snooze === "loading" && <span className="loading-spinner"></span>}
           {loadingStatus.snooze === "success" && "✅ Updated"}
           {loadingStatus.snooze === "idle" && "Save"}
+          {loadingStatus.snooze === "loading" && "Updating..."}
         </button>
       </div>
 
@@ -171,15 +208,24 @@ function generateTimeOptions() {
   const options = [];
   for (let h = 0; h < 24; h++) {
     const v = `${h.toString().padStart(2, "0")}:00`;
-    options.push(<option key={v} value={v}>{v}</option>);
+    options.push(
+      <option key={v} value={v}>
+        {v}
+      </option>
+    );
   }
   return options;
 }
 
 function parseJwt(token) {
   try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
     return JSON.parse(json);
   } catch {
     return {};
