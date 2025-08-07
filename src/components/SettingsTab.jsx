@@ -7,14 +7,15 @@ export default function SettingsTab() {
   const [authToken, setAuthToken] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [originalNotifications, setOriginalNotifications] = useState(true);
-  const [dndFrom, setDndFrom] = useState("22:00");
-  const [dndTo, setDndTo] = useState("07:00");
+  const [dndEnabled, setDndEnabled] = useState(true);
+  const [dndFrom, setDndFrom] = useState("09:00");
+  const [dndTo, setDndTo] = useState("18:00");
   const [snoozedUntil, setSnoozedUntil] = useState(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [debugLog, setDebugLog] = useState("");
 
   const [loadingStatus, setLoadingStatus] = useState({
-    notifications: "idle", // idle | loading | success
+    notifications: "idle",
     snooze: "idle",
     dnd: "idle",
   });
@@ -40,20 +41,15 @@ export default function SettingsTab() {
               setNotificationsEnabled(data.notificationsEnabled);
               setOriginalNotifications(data.notificationsEnabled);
               setSnoozedUntil(data.snoozedUntilUtc);
-              setDndFrom(data.dndStart || "22:00");
-              setDndTo(data.dndEnd || "07:00");
+              const start = data.dndStart || "09:00";
+              const end = data.dndEnd || "18:00";
+              setDndFrom(start);
+              setDndTo(end);
+              setDndEnabled(!(start === "00:00" && end === "00:00"));
               setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
             })
             .catch((err) => {
-              const errorDetails = [
-                "[Error] Failed to load settings",
-                `Message: ${err.message}`,
-                `Stack: ${err.stack}`,
-                `Location: ${window.location.href}`,
-                `Navigator Online: ${navigator.onLine}`,
-                `ObjectId: ${objectId}`
-              ].join("\n");
-              setDebugLog((prev) => prev + "\n" + errorDetails);
+              setDebugLog((prev) => prev + `\n[Error] Failed to load settings: ${err.message}`);
             })
             .finally(() => setSettingsLoading(false));
         },
@@ -71,8 +67,8 @@ export default function SettingsTab() {
       objectId,
       notificationsEnabled,
       snoozedUntilUtc: snoozedUntil,
-      dndStart: dndFrom,
-      dndEnd: dndTo,
+      dndStart: dndEnabled ? dndFrom : "00:00",
+      dndEnd: dndEnabled ? dndTo : "00:00",
       ...newSettings,
     };
 
@@ -86,12 +82,13 @@ export default function SettingsTab() {
       });
 
       const responseText = await res.text();
-      setDebugLog((prev) => prev +
+      setDebugLog((prev) =>
+        prev +
         `\n[Response Status] ${res.status}` +
-        `\n[Response Headers]\n${JSON.stringify(Object.fromEntries(res.headers.entries()), null, 2)}` +
         `\n[Response Body]\n${responseText}`);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok || responseText.includes("Please try again later")) throw new Error("Backend rejected update");
+
       return true;
     } catch (err) {
       setDebugLog((prev) => prev + `\n[Error] Update failed: ${err.message}`);
@@ -109,7 +106,7 @@ export default function SettingsTab() {
     if (success) {
       setTimeout(() => {
         setLoadingStatus((s) => ({ ...s, [key]: "success" }));
-      }, 50); // slight delay to transition from loading to success
+      }, 100);
     }
   };
 
@@ -119,9 +116,15 @@ export default function SettingsTab() {
     setDebugLog((prev) => prev + `\n[UI] SnoozedUntilUtc set to ${snoozeTime}`);
   };
 
-  const formatDateTime = (dt) => new Date(dt).toLocaleString("en-GB", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
-  });
+  const formatDateTime = (dt) =>
+    new Date(dt).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
 
   if (settingsLoading) return <div className="settings-loading">Loading settings...</div>;
 
@@ -153,15 +156,40 @@ export default function SettingsTab() {
       {/* DND */}
       <div className="card">
         <h3>Do Not Disturb</h3>
-        <p>Set quiet hours to suppress alerts automatically.</p>
-        <div className="time-selectors">
-          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)}>{generateTimeOptions()}</select>
-          <span>to</span>
-          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>{generateTimeOptions()}</select>
+        <p>Enable quiet hours to suppress alerts.</p>
+
+        <div className="dnd-toggle">
+          <label>
+            <input
+              type="radio"
+              checked={dndEnabled}
+              onChange={() => setDndEnabled(true)}
+            />
+            Enable
+          </label>
+          <label style={{ marginLeft: "20px" }}>
+            <input
+              type="radio"
+              checked={!dndEnabled}
+              onChange={() => setDndEnabled(false)}
+            />
+            Disable
+          </label>
         </div>
+
+        <div className="time-selectors">
+          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)} disabled={!dndEnabled}>
+            {generateTimeOptions()}
+          </select>
+          <span>to</span>
+          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)} disabled={!dndEnabled}>
+            {generateTimeOptions()}
+          </select>
+        </div>
+
         <button
           className={`save-button ${loadingStatus.dnd}`}
-          onClick={() => runSave("dnd", { dndStart: dndFrom, dndEnd: dndTo })}
+          onClick={() => runSave("dnd", { dndStart: dndEnabled ? dndFrom : "00:00", dndEnd: dndEnabled ? dndTo : "00:00" })}
           disabled={loadingStatus.dnd !== "idle"}
         >
           {loadingStatus.dnd === "loading" && <span className="loading-spinner"></span>}
@@ -173,7 +201,7 @@ export default function SettingsTab() {
       {/* Snooze */}
       <div className="card">
         <h3>Snooze Alerts</h3>
-        <p>Pause notifications temporarily.</p>
+        <p>Temporarily pause all alerts.</p>
         <div className="snooze-buttons">
           <button onClick={() => handleSnooze(1)}>1h</button>
           <button onClick={() => handleSnooze(4)}>4h</button>
