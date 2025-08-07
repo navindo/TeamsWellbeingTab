@@ -183,3 +183,8 @@ select {
   font-size: 16px;
   color: #555;
 }
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

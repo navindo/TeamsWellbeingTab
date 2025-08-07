@@ -1,3 +1,4 @@
+// (NO CHANGE TO IMPORTS)
 import React, { useState, useEffect } from "react";
 import * as microsoftTeams from "@microsoft/teams-js";
 import "./SettingsTab.css";
@@ -6,6 +7,7 @@ export default function SettingsTab() {
   const [objectId, setObjectId] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [originalNotifications, setOriginalNotifications] = useState(true);
   const [dndFrom, setDndFrom] = useState("22:00");
   const [dndTo, setDndTo] = useState("07:00");
   const [snoozedUntil, setSnoozedUntil] = useState(null);
@@ -36,6 +38,7 @@ export default function SettingsTab() {
             })
             .then((data) => {
               setNotificationsEnabled(data.notificationsEnabled);
+              setOriginalNotifications(data.notificationsEnabled);
               setSnoozedUntil(data.snoozedUntilUtc);
               setDndFrom(data.dndStart || "22:00");
               setDndTo(data.dndEnd || "07:00");
@@ -50,7 +53,6 @@ export default function SettingsTab() {
                 `Navigator Online: ${navigator.onLine}`,
                 `ObjectId: ${objectId}`
               ].join("\n");
-
               setDebugLog((prev) => prev + "\n" + errorDetails);
             })
             .finally(() => setSettingsLoading(false));
@@ -88,9 +90,7 @@ export default function SettingsTab() {
     try {
       const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -98,8 +98,7 @@ export default function SettingsTab() {
       setDebugLog((prev) => prev +
         `\n[Response Status] ${res.status}` +
         `\n[Response Headers]\n${JSON.stringify(Object.fromEntries(res.headers.entries()), null, 2)}` +
-        `\n[Response Body]\n${responseText}`
-      );
+        `\n[Response Body]\n${responseText}`);
 
       if (!res.ok) throw new Error(`HTTP ${res.status} - ${responseText}`);
       return true;
@@ -118,31 +117,23 @@ export default function SettingsTab() {
     }
   };
 
-  const handleToggleNotifications = async () => {
-    setDebugLog((prev) => prev + "\n[UI] Toggle Notifications button clicked");
-    const newValue = !notificationsEnabled;
+  const handleSaveNotifications = async () => {
+    setDebugLog((prev) => prev + "\n[UI] Save Notification clicked");
     setToggleLoading(true);
-
-    const timeout = setTimeout(() => setToggleLoading(false), 15000); // auto-clear after 15s
-
-    const success = await updateSettings({ notificationsEnabled: newValue });
-    clearTimeout(timeout);
-
+    const success = await updateSettings({ notificationsEnabled });
     if (success) {
-      setNotificationsEnabled(newValue);
+      setOriginalNotifications(notificationsEnabled);
       showToastMessage("Notification setting updated.");
-      setDebugLog((prev) => prev + "\n[UI] Notifications toggled successfully");
+      setDebugLog((prev) => prev + "\n[UI] Notifications saved successfully");
     } else {
-      setDebugLog((prev) => prev + "\n[UI] Notification toggle failed");
+      setDebugLog((prev) => prev + "\n[UI] Notification update failed");
     }
-
     setToggleLoading(false);
   };
 
   const handleSaveSnooze = async () => {
     setDebugLog((prev) => prev + `\n[UI] Save Snooze clicked`);
     setSnoozeLoading(true);
-
     const success = await updateSettings({ snoozedUntilUtc: snoozedUntil });
     if (success) {
       showToastMessage(`Snooze updated.`);
@@ -150,7 +141,6 @@ export default function SettingsTab() {
     } else {
       setDebugLog((prev) => prev + "\n[UI] Snooze update failed");
     }
-
     setSnoozeLoading(false);
   };
 
@@ -195,11 +185,20 @@ export default function SettingsTab() {
         <h3>Notifications</h3>
         <p>Toggle all alerts on or off.</p>
         <button
-          className={`toggle-button ${notificationsEnabled ? "on" : "off"} ${toggleLoading ? "loading" : ""}`}
-          onClick={handleToggleNotifications}
-          disabled={toggleLoading}
+          className={`toggle-button ${notificationsEnabled ? "on" : "off"}`}
+          onClick={() => {
+            setDebugLog((prev) => prev + "\n[UI] Toggle clicked");
+            setNotificationsEnabled((prev) => !prev);
+          }}
         >
-          {toggleLoading ? "Updating..." : notificationsEnabled ? "Enabled" : "Disabled"}
+          {notificationsEnabled ? "Enabled" : "Disabled"}
+        </button>
+        <button
+          className="save-button"
+          onClick={handleSaveNotifications}
+          disabled={toggleLoading || notificationsEnabled === originalNotifications}
+        >
+          {toggleLoading ? "Saving..." : "Save Notification"}
         </button>
       </div>
 
@@ -207,17 +206,11 @@ export default function SettingsTab() {
         <h3>Do Not Disturb</h3>
         <p>Set quiet hours to suppress alerts automatically.</p>
         <div className="time-selectors">
-          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)}>
-            {generateTimeOptions()}
-          </select>
+          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)}>{generateTimeOptions()}</select>
           <span>to</span>
-          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>
-            {generateTimeOptions()}
-          </select>
+          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>{generateTimeOptions()}</select>
         </div>
-        <button className="save-button" onClick={handleSaveDND}>
-          Save
-        </button>
+        <button className="save-button" onClick={handleSaveDND}>Save</button>
       </div>
 
       <div className="card">
@@ -228,9 +221,7 @@ export default function SettingsTab() {
           <button onClick={() => handleSnooze(4)}>4h</button>
           <button onClick={() => handleSnooze(24)}>24h</button>
         </div>
-        {snoozedUntil && (
-          <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>
-        )}
+        {snoozedUntil && <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>}
         <button className="save-button" onClick={handleSaveSnooze} disabled={snoozeLoading}>
           {snoozeLoading ? "Saving..." : "Save Snooze"}
         </button>
@@ -246,11 +237,7 @@ function generateTimeOptions() {
   const options = [];
   for (let h = 0; h < 24; h++) {
     const value = `${h.toString().padStart(2, "0")}:00`;
-    options.push(
-      <option value={value} key={value}>
-        {value}
-      </option>
-    );
+    options.push(<option value={value} key={value}>{value}</option>);
   }
   return options;
 }
@@ -258,11 +245,9 @@ function generateTimeOptions() {
 function parseJwt(token) {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(atob(base64).split('').map(function (c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
+    const json = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     return JSON.parse(json);
-  } catch (e) {
+  } catch {
     return {};
   }
 }
