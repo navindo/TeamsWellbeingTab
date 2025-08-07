@@ -9,58 +9,57 @@ export default function SettingsTab() {
   const [dndFrom, setDndFrom] = useState("22:00");
   const [dndTo, setDndTo] = useState("07:00");
   const [snoozedUntil, setSnoozedUntil] = useState(null);
+
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [toggleLoading, setToggleLoading] = useState(false);
+  const [snoozeLoading, setSnoozeLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-  const [toggleLoading, setToggleLoading] = useState(false);
   const [debugLog, setDebugLog] = useState("");
 
   useEffect(() => {
-    microsoftTeams.app
-      .initialize()
-      .then(() => {
-        setDebugLog((prev) => prev + "\n[Teams] SDK initialized. Requesting auth token...");
+    microsoftTeams.app.initialize().then(() => {
+      setDebugLog((prev) => prev + "\n[Teams] SDK initialized. Requesting auth token...");
 
-        microsoftTeams.authentication.getAuthToken({
-          successCallback: (token) => {
-            const decoded = parseJwt(token);
-            const objectId = decoded.oid;
-            setObjectId(objectId);
-            setAuthToken(token);
-            setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
+      microsoftTeams.authentication.getAuthToken({
+        successCallback: (token) => {
+          const decoded = parseJwt(token);
+          const objectId = decoded.oid;
+          setObjectId(objectId);
+          setAuthToken(token);
+          setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
 
-            fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
-              .then((res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-              })
-              .then((data) => {
-                setNotificationsEnabled(data.notificationsEnabled);
-                setSnoozedUntil(data.snoozedUntilUtc);
-                setDndFrom(data.dndStart || "22:00");
-                setDndTo(data.dndEnd || "07:00");
-                setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
-              })
-              .catch((err) => {
-                const errorDetails = [
-                  "[Error] Failed to load settings",
-                  `Message: ${err.message}`,
-                  `Stack: ${err.stack}`,
-                  `Location: ${window.location.href}`,
-                  `Navigator Online: ${navigator.onLine}`,
-                  `ObjectId: ${objectId}`
-                ].join("\n");
+          fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
+            .then((res) => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+            })
+            .then((data) => {
+              setNotificationsEnabled(data.notificationsEnabled);
+              setSnoozedUntil(data.snoozedUntilUtc);
+              setDndFrom(data.dndStart || "22:00");
+              setDndTo(data.dndEnd || "07:00");
+              setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
+            })
+            .catch((err) => {
+              const errorDetails = [
+                "[Error] Failed to load settings",
+                `Message: ${err.message}`,
+                `Stack: ${err.stack}`,
+                `Location: ${window.location.href}`,
+                `Navigator Online: ${navigator.onLine}`,
+                `ObjectId: ${objectId}`
+              ].join("\n");
 
-                setDebugLog((prev) => prev + "\n" + errorDetails);
-              });
-          },
-          failureCallback: (err) => {
-            setDebugLog((prev) => prev + `\n[Error] getAuthToken failed: ${err}`);
-          }
-        });
-      })
-      .catch((err) => {
-        setDebugLog((prev) => prev + "\n[Error] Teams SDK init failed: " + err.message);
+              setDebugLog((prev) => prev + "\n" + errorDetails);
+            })
+            .finally(() => setSettingsLoading(false));
+        },
+        failureCallback: (err) => {
+          setDebugLog((prev) => prev + `\n[Error] getAuthToken failed: ${err}`);
+        }
       });
+    });
   }, []);
 
   const showToastMessage = (msg) => {
@@ -124,7 +123,11 @@ export default function SettingsTab() {
     const newValue = !notificationsEnabled;
     setToggleLoading(true);
 
+    const timeout = setTimeout(() => setToggleLoading(false), 15000); // auto-clear after 15s
+
     const success = await updateSettings({ notificationsEnabled: newValue });
+    clearTimeout(timeout);
+
     if (success) {
       setNotificationsEnabled(newValue);
       showToastMessage("Notification setting updated.");
@@ -136,24 +139,29 @@ export default function SettingsTab() {
     setToggleLoading(false);
   };
 
-  const handleSnooze = async (hours) => {
-    setDebugLog((prev) => prev + `\n[UI] Snooze ${hours}h clicked`);
+  const handleSaveSnooze = async () => {
+    setDebugLog((prev) => prev + `\n[UI] Save Snooze clicked`);
+    setSnoozeLoading(true);
 
-    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-    setSnoozedUntil(snoozeTime);
-
-    const success = await updateSettings({ snoozedUntilUtc: snoozeTime });
+    const success = await updateSettings({ snoozedUntilUtc: snoozedUntil });
     if (success) {
-      showToastMessage(`Snoozed for ${hours}h`);
-      setDebugLog((prev) => prev + `\n[UI] Snoozed until ${snoozeTime}`);
+      showToastMessage(`Snooze updated.`);
+      setDebugLog((prev) => prev + `\n[UI] Snooze updated successfully`);
     } else {
-      setDebugLog((prev) => prev + "\n[UI] Snooze failed");
+      setDebugLog((prev) => prev + "\n[UI] Snooze update failed");
     }
+
+    setSnoozeLoading(false);
   };
 
-  const handleSave = async () => {
-    setDebugLog((prev) => prev + "\n[UI] Save DND clicked");
+  const handleSnooze = (hours) => {
+    const snoozeTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    setSnoozedUntil(snoozeTime);
+    setDebugLog((prev) => prev + `\n[UI] SnoozedUntilUtc set to ${snoozeTime}`);
+  };
 
+  const handleSaveDND = async () => {
+    setDebugLog((prev) => prev + "\n[UI] Save DND clicked");
     const success = await updateSettings({});
     if (success) {
       showToastMessage("DND settings updated.");
@@ -175,6 +183,10 @@ export default function SettingsTab() {
     });
   };
 
+  if (settingsLoading) {
+    return <div className="settings-loading">Loading settings...</div>;
+  }
+
   return (
     <div className="settings-container">
       <h2 className="settings-title">🔔 My Alert Settings</h2>
@@ -195,21 +207,15 @@ export default function SettingsTab() {
         <h3>Do Not Disturb</h3>
         <p>Set quiet hours to suppress alerts automatically.</p>
         <div className="time-selectors">
-          <select value={dndFrom} onChange={(e) => {
-            setDndFrom(e.target.value);
-            setDebugLog((prev) => prev + `\n[UI] DND From changed to ${e.target.value}`);
-          }}>
+          <select value={dndFrom} onChange={(e) => setDndFrom(e.target.value)}>
             {generateTimeOptions()}
           </select>
           <span>to</span>
-          <select value={dndTo} onChange={(e) => {
-            setDndTo(e.target.value);
-            setDebugLog((prev) => prev + `\n[UI] DND To changed to ${e.target.value}`);
-          }}>
+          <select value={dndTo} onChange={(e) => setDndTo(e.target.value)}>
             {generateTimeOptions()}
           </select>
         </div>
-        <button className="save-button" onClick={handleSave}>
+        <button className="save-button" onClick={handleSaveDND}>
           Save
         </button>
       </div>
@@ -225,6 +231,9 @@ export default function SettingsTab() {
         {snoozedUntil && (
           <p className="info-text">Snoozed until: {formatDateTime(snoozedUntil)}</p>
         )}
+        <button className="save-button" onClick={handleSaveSnooze} disabled={snoozeLoading}>
+          {snoozeLoading ? "Saving..." : "Save Snooze"}
+        </button>
       </div>
 
       {showToast && <div className="toast">{toastMessage}</div>}

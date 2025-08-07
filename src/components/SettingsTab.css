@@ -177,3 +177,9 @@ select {
   overflow-y: auto;
 }
 
+.settings-loading {
+  text-align: center;
+  margin-top: 40px;
+  font-size: 16px;
+  color: #555;
+}
