@@ -227,7 +227,7 @@ export default function SettingsTab() {
         </button>
       </div>
 
-      {showToast && <div className="toast">{toastMessage}</div>}
+{showToast && <div className="toast">{toastMessage}</div>}
       {debugLog && <pre className="debug-log">{debugLog}</pre>}
     </div>
   );
