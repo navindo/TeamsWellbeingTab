@@ -42,6 +42,7 @@
   transition: all 0.2s ease-in-out;
   cursor: pointer;
   position: relative;
+  margin-bottom: 12px;
 }
 
 .toggle-button.on {
@@ -59,26 +60,6 @@
   cursor: not-allowed;
 }
 
-.toggle-button.loading::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 16px;
-  width: 14px;
-  height: 14px;
-  border: 2px solid white;
-  border-top-color: #e0001b;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  transform: translateY(-50%);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Save Button */
 .save-button {
   background-color: #e0001b;
@@ -89,6 +70,8 @@
   border-radius: 8px;
   cursor: pointer;
   position: relative;
+  transition: background-color 0.2s ease;
+  margin-top: 10px;
 }
 
 .save-button:hover {
@@ -105,6 +88,7 @@
   opacity: 0.6;
 }
 
+/* Spinner */
 .loading-spinner {
   display: inline-block;
   width: 18px;
@@ -113,8 +97,17 @@
   border-radius: 50%;
   border-top-color: transparent;
   animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Success checkmark */
 .success-checkmark {
   display: inline-block;
   margin-left: 8px;
@@ -213,13 +206,14 @@ select {
   background-color: #fce6e9;
 }
 
-/* Other */
+/* Info text */
 .info-text {
   font-size: 13px;
   color: #777;
   margin-top: 10px;
 }
 
+/* Debug log */
 .debug-log {
   background-color: #f9f9f9;
   border: 1px solid #ccc;
@@ -233,6 +227,7 @@ select {
   overflow-y: auto;
 }
 
+/* Initial loading */
 .settings-loading {
   text-align: center;
   margin-top: 40px;
