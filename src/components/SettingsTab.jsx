@@ -15,63 +15,124 @@ export default function SettingsTab() {
   const [debugLog, setDebugLog] = useState("");
   const [loadingStatus, setLoadingStatus] = useState({ notifications: "idle", snooze: "idle", dnd: "idle" });
 
+  const API_BASE = "https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net";
+
+  const addLog = (msg) => setDebugLog((prev) => (prev ? prev + "\n" : "") + msg);
+
+  const previewText = async (res) => {
+    try {
+      const t = await res.clone().text();
+      if (!t) return "<empty>";
+      return t.length > 1200 ? t.slice(0, 1200) + "...<truncated>" : t;
+    } catch {
+      return "<non-text response>";
+    }
+  };
+
+  const headersToObj = (headers) => {
+    const o = {};
+    try { headers.forEach((v, k) => (o[k] = v)); } catch {}
+    return o;
+  };
+
   useEffect(() => {
     microsoftTeams.app.initialize().then(() => {
-      setDebugLog((prev) => prev + "\n[Teams] SDK initialized. Requesting auth token...");
+      addLog("[Teams] SDK initialized. Requesting auth token...");
       microsoftTeams.authentication.getAuthToken({
-        successCallback: (token) => {
+        successCallback: async (token) => {
           const decoded = parseJwt(token);
-          const objectId = decoded.oid;
-          setObjectId(objectId);
+          const oid = decoded.oid;
+          setObjectId(oid);
           setAuthToken(token);
-          setDebugLog((prev) => prev + `\n[Teams] SSO token received. ObjectId=${objectId}`);
-          fetch(`https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings?objectId=${objectId}`)
-            .then((res) => {
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              return res.json();
-            })
-            .then((data) => {
-              setNotificationsEnabled(data.notificationsEnabled);
-              setOriginalNotifications(data.notificationsEnabled);
-              setSnoozedUntil(data.snoozedUntilUtc);
-              const start = data.dndStart || "09:00";
-              const end = data.dndEnd || "18:00";
-              setDndFrom(start);
-              setDndTo(end);
-              setDndEnabled(!(start === "00:00" && end === "00:00"));
-              setDebugLog((prev) => prev + "\n[Init] Settings loaded successfully");
-            })
-            .catch((err) => setDebugLog((prev) => prev + `\n[Error] Failed to load settings: ${err.message}`))
-            .finally(() => setSettingsLoading(false));
+          addLog(`[Teams] SSO token received. objectId=${oid || "(missing)"}`);
+
+          const url = `${API_BASE}/api/user/settings?objectId=${encodeURIComponent(oid || "")}`;
+          const started = performance.now();
+          addLog(`[GET] ${url}`);
+
+          try {
+            const res = await fetch(url, {
+              method: "GET"
+              // If your API expects the Teams SSO token, uncomment:
+              // headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const dur = Math.round(performance.now() - started);
+            const headers = headersToObj(res.headers);
+            const bodyPrev = await previewText(res);
+
+            addLog(`[GET] status=${res.status} ${res.statusText} (${dur}ms)`);
+            addLog(`[GET] headers=${JSON.stringify(headers)}`);
+            addLog(`[GET] bodyPreview:\n${bodyPrev}`);
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            // Only parse JSON after we know it's OK
+            let data;
+            try {
+              data = await res.json();
+            } catch {
+              throw new Error("Response is not valid JSON");
+            }
+
+            setNotificationsEnabled(data.notificationsEnabled);
+            setOriginalNotifications(data.notificationsEnabled);
+            setSnoozedUntil(data.snoozedUntilUtc);
+
+            const start = data.dndStart || "09:00";
+            const end = data.dndEnd || "18:00";
+            setDndFrom(start);
+            setDndTo(end);
+            setDndEnabled(!(start === "00:00" && end === "00:00"));
+
+            addLog("[Init] Settings loaded successfully");
+          } catch (err) {
+            addLog(`[Error] Failed to load settings: ${err?.message || err}`);
+          } finally {
+            setSettingsLoading(false);
+          }
         },
-        failureCallback: (err) => setDebugLog((prev) => prev + `\n[Error] getAuthToken failed: ${err}`),
+        failureCallback: (err) => addLog(`[Error] getAuthToken failed: ${err}`)
       });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateSettings = async (newSettings) => {
     if (!objectId) return false;
+
     const payload = {
       objectId,
       notificationsEnabled,
       snoozedUntilUtc: snoozedUntil,
       dndStart: dndEnabled ? dndFrom : "00:00",
       dndEnd: dndEnabled ? dndTo : "00:00",
-      ...newSettings,
+      ...newSettings
     };
-    setDebugLog((prev) => prev + "\n[Request] Sending settings:\n" + JSON.stringify(payload, null, 2));
+
+    const url = `${API_BASE}/api/user/settings`;
+    addLog(`[POST] ${url}`);
+    addLog("[Request] " + JSON.stringify(payload, null, 2));
+
+    const started = performance.now();
     try {
-      const res = await fetch("https://wellbeingbot-dfcreretembra9bm.southeastasia-01.azurewebsites.net/api/user/settings", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        // If your API accepts SSO token, you can also send it:
+        // headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(payload)
       });
-      const responseText = await res.text();
-      setDebugLog((prev) => prev + `\n[Response Status] ${res.status}\n[Response Body]\n${responseText}`);
-      if (!res.ok || responseText.includes("Please try again later")) throw new Error("Backend rejected update");
+
+      const dur = Math.round(performance.now() - started);
+      const body = await res.text();
+      addLog(`[Response] status=${res.status} ${res.statusText} (${dur}ms)`);
+      addLog(`[Response Body]\n${body.length > 1200 ? body.slice(0, 1200) + "...<truncated>" : body}`);
+
+      if (!res.ok || body.includes("Please try again later")) throw new Error("Backend rejected update");
       return true;
     } catch (err) {
-      setDebugLog((prev) => prev + `\n[Error] Update failed: ${err.message}`);
+      addLog(`[Error] Update failed: ${err?.message || err}`);
       return false;
     }
   };
@@ -80,7 +141,7 @@ export default function SettingsTab() {
     setLoadingStatus((s) => ({ ...s, [key]: "loading" }));
     let success = await updateSettings(settings);
     if (!success) {
-      setDebugLog((prev) => prev + `\n[Retry] Waiting 2 mins and retrying update...`);
+      addLog("[Retry] Waiting 2 mins and retrying update...");
       await new Promise((resolve) => setTimeout(resolve, 120000));
       success = await updateSettings(settings);
     }
@@ -103,7 +164,7 @@ export default function SettingsTab() {
   const handleSnooze = (hours) => {
     const snoozeTime = new Date(Date.now() + hours * 3600000).toISOString();
     setSnoozedUntil(snoozeTime);
-    setDebugLog((prev) => prev + `\n[UI] SnoozedUntilUtc set to ${snoozeTime}`);
+    addLog(`[UI] SnoozedUntilUtc set to ${snoozeTime}`);
   };
 
   const formatDateTime = (dt) =>
@@ -113,14 +174,14 @@ export default function SettingsTab() {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true,
+      hour12: true
     });
 
   if (settingsLoading) return <div className="settings-loading">Loading settings...</div>;
 
   return (
     <div className="settings-container">
-      <h2 className="settings-title">🔔 My Alert Settings</h2>
+      <h2 className="settings-title">My Alert Settings</h2>
 
       <div className="card">
         <h3>Notifications</h3>
@@ -139,7 +200,7 @@ export default function SettingsTab() {
             onClick={() => runSave("notifications", { notificationsEnabled })}
           >
             {loadingStatus.notifications === "loading" && <span className="loading-spinner"></span>}
-            {loadingStatus.notifications === "success" && "✅ Updated"}
+            {loadingStatus.notifications === "success" && "Updated"}
             {loadingStatus.notifications === "idle" && "Save"}
             {loadingStatus.notifications === "loading" && "Updating..."}
           </button>
@@ -172,7 +233,7 @@ export default function SettingsTab() {
           disabled={loadingStatus.dnd === "loading"}
         >
           {loadingStatus.dnd === "loading" && <span className="loading-spinner"></span>}
-          {loadingStatus.dnd === "success" && "✅ Updated"}
+          {loadingStatus.dnd === "success" && "Updated"}
           {loadingStatus.dnd === "idle" && "Save"}
           {loadingStatus.dnd === "loading" && "Updating..."}
         </button>
@@ -193,7 +254,7 @@ export default function SettingsTab() {
           disabled={loadingStatus.snooze === "loading"}
         >
           {loadingStatus.snooze === "loading" && <span className="loading-spinner"></span>}
-          {loadingStatus.snooze === "success" && "✅ Updated"}
+          {loadingStatus.snooze === "success" && "Updated"}
           {loadingStatus.snooze === "idle" && "Save"}
           {loadingStatus.snooze === "loading" && "Updating..."}
         </button>
